@@ -7,6 +7,8 @@ import {
 import { connection } from './app'
 import { CommunityUser, CommunityUserProgression, Progression } from "./entity/"
 
+import {getRepository} from "typeorm"
+
 // const STORAGE_KEY = 'qiskit/textbook/course'
 // const merge = function (target, source) {
 //   for (const key of Object.keys(source)) {
@@ -48,29 +50,44 @@ const setProgressData = function (
   return out
 }
 
-const getProgressData = function (
+const getProgressData = async function (
   req: Request, course: Course, section: Section
-): APIResponse<SectionProgressData>|undefined {
+): Promise<APIResponse<SectionProgressData>|undefined> {
 
   let out: APIResponse<SectionProgressData> = { status: 400 }
 
-  connection
-    .then(async connection => {
-      // get user
-      let user = await connection.manager.findOne(CommunityUser, req.params.communityUserID)
+  try {
+    const communityUserRepository = getRepository(CommunityUser)
+    const communityUserProgressionRepository = getRepository(CommunityUserProgression)
+    const communityUser = await communityUserRepository.findOne(req.params.communityUserID)
+    const communityUserProgression = await communityUserProgressionRepository.findOne(communityUser?.communityUserProgressionID)
+    const progresssion: Progression = communityUserProgression?.progression!
+
+    out.status = 200
+    out.data = progresssion[course.id][section.id]
+  } catch(error) {
+    out.status = 500
+    out.error = error as Error
+  }
+
+  return out
+  // connection
+  //   .then(async connection => {
+  //     // get user
+  //     let user = await connection.manager.findOne(CommunityUser, req.params.communityUserID)
       
-      // get user's progress
-      let userProgress = await connection.manager.findOne(CommunityUserProgression, user?.communityUserProgressionID)
+  //     // get user's progress
+  //     let userProgress = await connection.manager.findOne(CommunityUserProgression, user?.communityUserProgressionID)
 
-      const progresssion: Progression = userProgress?.progression!
+  //     const progresssion: Progression = userProgress?.progression!
 
-      out.status = 200
-      out.data = progresssion[course.id][section.id]
-    })
-    .catch(error => {
-        out.status = 500
-        out.error = error
-    });
+  //     out.status = 200
+  //     out.data = progresssion[course.id][section.id]
+  //   })
+  //   .catch(error => {
+  //       out.status = 500
+  //       out.error = error
+  //   });
 
   return out
 }
